@@ -233,9 +233,9 @@ export default function domux(defaultContainer, modelAccessor) {
       return instance;
     }
     // model is not changed
-    if (isEqual(container.__rootModel, rootModel)) {
-      return;
-    }
+    // if (isEqual(container.__rootModel, rootModel)) {
+    //   return;
+    // }
     container.__rootModel = rootModel;
     for (let i = 0; i < bindings.length; i++) {
       bindings[i](rootModel, container, context);

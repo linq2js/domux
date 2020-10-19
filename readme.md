@@ -253,6 +253,7 @@ function increase(by) {
 
 ## Advanced Usages
 - [Domux and Immer](https://codesandbox.io/s/domux-immer-5uqny?file=/src/index.js)
+- [Tree view](https://codesandbox.io/s/domux-tree-v89g8?file=/src/index.js)
 
 ## References
 
