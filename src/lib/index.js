@@ -1,5 +1,6 @@
 const defaultDomSelector = (model) => model;
 const templateClassName = "domux-template";
+let lastQuery;
 
 export default function domux(defaultContainer, modelAccessor) {
   if (
@@ -17,9 +18,6 @@ export default function domux(defaultContainer, modelAccessor) {
     dispatch,
   };
   const bindings = [];
-  const currentContext = {
-    dispatch,
-  };
   let hasChange = false;
   let isBuiltInModel = false;
   let dispatchScopes = 0;
@@ -72,17 +70,31 @@ export default function domux(defaultContainer, modelAccessor) {
   //   };
   // }
 
-  function add() {
-    // add(domSelector, binder)
-    // add(domSelector, itemBinder)
-    if (arguments.length === 2 && typeof arguments[1] !== "function") {
-      return add(arguments[0], undefined, arguments[1]);
+  function addSingle(
+    domSelector,
+    modelSelector = defaultDomSelector,
+    itemBinder
+  ) {
+    if (modelSelector instanceof DomAppender) {
+      const appender = modelSelector;
+      bindings.push(function updateBinding(
+        rootModel,
+        container,
+        parentContext
+      ) {
+        const dom = query(container, domSelector);
+        if (!dom.__appended) {
+          dom.__appended = new WeakSet();
+        }
+        if (dom.__appended.has(appender)) {
+          return;
+        }
+        dom.__appended.add(appender);
+        appender.append(container, dom);
+      });
+      return instance;
     }
-    const [
-      domSelector,
-      modelSelector = defaultDomSelector,
-      itemBinder,
-    ] = arguments;
+
     // add(domSelector, modelSelector, itemBinder)
     const isBinder =
       typeof itemBinder === "object" && typeof itemBinder.update === "function";
@@ -127,10 +139,7 @@ export default function domux(defaultContainer, modelAccessor) {
       context.callback = bindingCache.callbacks;
 
       context.update = () => updateBinding(...arguments);
-      const dom =
-        domSelector === "this"
-          ? container
-          : container.querySelector(domSelector);
+      const dom = query(container, domSelector);
       const model = modelSelector(rootModel, context);
 
       if (isBinder) {
@@ -190,7 +199,26 @@ export default function domux(defaultContainer, modelAccessor) {
         dom.__model = model;
       }
     });
+  }
 
+  function add() {
+    if (typeof arguments[0] === "object") {
+      for (let i = 0; i < arguments.length; i++) {
+        const { target, props, binder, list, item } = arguments[i];
+        addSingle(target, props || list, binder || item);
+      }
+      return instance;
+    }
+    // add(domSelector, binder)
+    // add(domSelector, itemBinder)
+    if (
+      arguments.length === 2 &&
+      typeof arguments[1] !== "function" &&
+      !(arguments[1] instanceof DomAppender)
+    ) {
+      return add(arguments[0], undefined, arguments[1]);
+    }
+    addSingle(...arguments);
     return instance;
   }
 
@@ -218,6 +246,12 @@ export default function domux(defaultContainer, modelAccessor) {
   return instance;
 }
 
+export class DomAppender {
+  constructor(append) {
+    this.append = append;
+  }
+}
+
 Object.assign(domux, {
   model(props) {
     return new Model(props);
@@ -225,7 +259,45 @@ Object.assign(domux, {
   add() {
     return domux().add(...arguments);
   },
+  self: new DomAppender((source, target) =>
+    target.appendChild(source.cloneNode(true))
+  ),
+  ref(ref) {
+    return new DomRef(ref);
+  },
 });
+
+class DomRef {
+  constructor(ref) {
+    this.ref = ref;
+  }
+
+  update() {
+    this.ref().update(...arguments);
+  }
+}
+
+/**
+ * make simple query cache
+ * @param container
+ * @param selector
+ * @return {*}
+ */
+function query(container, selector) {
+  if (selector === "this") return container;
+  if (
+    !lastQuery ||
+    lastQuery.container !== container ||
+    lastQuery.selector !== selector
+  ) {
+    lastQuery = {
+      container,
+      selector,
+      result: container.querySelector(selector),
+    };
+  }
+  return lastQuery.result;
+}
 
 function updateElement(dom, model, prevModel = {}) {
   if (!dom.__created) {

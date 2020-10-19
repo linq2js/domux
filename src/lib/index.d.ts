@@ -16,37 +16,59 @@ export interface Context extends Dispatcher {
   container: Element | Document;
 }
 
+export type DomSelector = "this" | string;
+
+export interface Binding<TModel> {
+  target: DomSelector;
+}
+
+export interface SingleElementBinding<TModel> extends Binding<TModel> {
+  props: (model?: TModel) => ElementProps;
+  binder: DomBinder<TModel>;
+}
+
+export interface MultipleElementsBinding<TModel, TItemModel>
+  extends Binding<TModel> {
+  list: (model?: TModel) => TItemModel[];
+  item:
+    | [DomBinder<TModel>]
+    | ((model?: TItemModel, context?: Context) => ElementProps);
+}
+
 export interface AddBinding<TModel = any> {
+  (domSelector: DomSelector, appender: DomAppender): DomBinder;
   (
-    domSelector: string,
-    propsBuilder: (model: TModel, context?: Context) => ElementProps
+    domSelector: DomSelector,
+    propsBuilder: (model?: TModel, context?: Context) => ElementProps
   ): DomBinder;
 
-  (domSelector: string, binder: DomBinder<TModel>): DomBinder;
+  (domSelector: DomSelector, binder: DomBinder<TModel>): DomBinder;
 
   <TItemModel>(
-    domSelector: string,
-    listModelSelector: (model: TModel) => TItemModel[],
-    itemPropsBuilder: (model: TItemModel, context?: Context) => ElementProps
+    domSelector: DomSelector,
+    listModelSelector: (model?: TModel) => TItemModel[],
+    itemPropsBuilder: (model?: TItemModel, context?: Context) => ElementProps
   ): DomBinder;
 
   <TItemModel>(
-    domSelector: string,
-    listModelSelector: (model: TModel) => TItemModel[],
+    domSelector: DomSelector,
+    listModelSelector: (model?: TModel) => TItemModel[],
     itemBinder: [DomBinder<TItemModel>]
   ): DomBinder;
 
   <TResult>(
-    domSelector: string,
-    modelSelector: (model: TModel) => TResult,
+    domSelector: DomSelector,
+    modelSelector: (model?: TModel) => TResult,
     binder: DomBinder<TResult>
   ): DomBinder;
+
+  (...bindings: Binding<TModel>[]);
 }
 
 export interface DomBinder<TModel = any> extends Dispatcher {
   add: AddBinding<TModel>;
 
-  update(): DomBinder;
+  update(model: TModel, container?: Element): DomBinder;
 }
 
 export interface Domux extends Function {
@@ -63,6 +85,12 @@ export interface Domux extends Function {
   (container: Element | Document): DomBinder;
   add: AddBinding;
   model<T extends { [key: string]: any }>(props: T): Model<T>;
+  self: DomAppender;
+  ref<TModel>(ref: () => DomBinder<TModel>): DomBinder<TModel>;
+}
+
+export class DomAppender {
+  constructor(append: (container: Element, target: Element) => any);
 }
 
 export class ModelBase {}
