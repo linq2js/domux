@@ -27,7 +27,10 @@ export default function domux(defaultContainer, modelAccessor) {
   if (modelAccessor instanceof Model) {
     isBuiltInModel = true;
     modelAccessor = modelAccessor.__accessor;
-    modelAccessor.listen(handleChange);
+  }
+
+  if (typeof modelAccessor.subscribe === "function") {
+    modelAccessor.subscribe(handleChange);
   }
 
   function handleChange() {
@@ -392,7 +395,7 @@ class Model {
   constructor(props = {}) {
     const listeners = [];
     this.__accessor = () => props;
-    this.__accessor.listen = (listener) => listeners.push(listener);
+    this.__accessor.subscribe = (listener) => listeners.push(listener);
     Object.keys(props).forEach((key) => {
       Object.defineProperty(this, key, {
         get() {

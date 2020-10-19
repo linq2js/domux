@@ -251,6 +251,16 @@ function increase(by) {
 }
 ```
 
+## References
+
+| Binding prop name                                             | Type        | Description / Examples                                                                                                   |
+| :------------------------------------------------------------ | ----------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Normal prop name: id, name, class, style, ...                 | Attribute   | Add attribute binding, binding value will convert to text                                                                |
+| Prop name starts with $: \$value, \$selected, \$disabled, ... | Property    | Add property binding, please refer [this](https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement) to get more info |
+| \$onXXX                                                       | Event       | { \$onclick(e) { alert(e.target.tagName) } }                                                                             |
+| #text                                                         | textContent | { '#text': 'Hello World' }                                                                                               |
+| #html                                                         | innerHTML   | { '#html': 'This is <strong>formatted text</strong>' }                                                                   |
+
 ## Dependencies
 
 Nothing
