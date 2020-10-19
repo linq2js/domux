@@ -70,8 +70,8 @@ binder.update(rootModel);
       font-weight: bold;
     }
   </style>
-  <input type="checkbox" />
-  <label>Click on checkbox to see an effect</label>
+  <input id="my-checkbox" type="checkbox" />
+  <label id="my-label">Click on checkbox to see an effect</label>
 </body>
 ```
 
@@ -82,14 +82,15 @@ import domux from "domux";
 
 let rootModel = false;
 const binder = domux
-  .add("input", (model) => ({
+  // add binding for my-checkbox element
+  .add("#my-checkbox", (model) => ({
     $onclick() {
       rootModel = !model;
       binder.update(rootModel);
     },
   }))
-  // add bindings for label element
-  .add("label", (model) => ({
+  // add bindings for my-label element
+  .add("#my-label", (model) => ({
     // toggle checked class according to model value
     // add checked class if model is true, unless remove checked class
     // you also assign string value to class binding
@@ -211,7 +212,7 @@ By default, Domux performs updating from document element, you can specify other
 const binder = domux(document.getElementById("root")).add("selector", () => {});
 ```
 
-## Builtin Model
+## Built-in Model
 
 Domux provides a built-in model class, that helps you modify app data more efficiently and easier
 
@@ -226,6 +227,28 @@ const rootBinder = domux(rootModel).add("h1", (model) => ({
     // dont need to call rootBinder.update(rootModel)
   },
 }));
+```
+
+### Updating multiple props of the built-in model
+
+When you are updating multiple props of the model that might lead to the rootBinder updates multiple times.
+You can wrap all updates inside a function and dispatch that function, the rootBinder only updates once.
+
+```js
+const rootModel = domux.model({ count: 1 });
+const rootBinder = domux(rootModel).add("h1", (
+  model,
+  // the second argument is binding context
+  // it contains dispatch(action, payload) method
+  { dispatch }
+) => ({
+  "#text": model.count,
+  $onclick: () => dispatch(increase, 1),
+}));
+
+function increase(by) {
+  rootModel.count += by;
+}
 ```
 
 ## Dependencies
