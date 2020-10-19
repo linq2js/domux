@@ -251,6 +251,9 @@ function increase(by) {
 }
 ```
 
+## Advanced Usages
+- [Domux and Immer](https://codesandbox.io/s/domux-immer-5uqny?file=/src/index.js)
+
 ## References
 
 | Binding prop name                                             | Type        | Description / Examples                                                                                                   |

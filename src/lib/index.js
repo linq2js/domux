@@ -29,7 +29,7 @@ export default function domux(defaultContainer, modelAccessor) {
     modelAccessor = modelAccessor.__accessor;
   }
 
-  if (typeof modelAccessor.subscribe === "function") {
+  if (modelAccessor && typeof modelAccessor.subscribe === "function") {
     modelAccessor.subscribe(handleChange);
   }
 
@@ -40,7 +40,7 @@ export default function domux(defaultContainer, modelAccessor) {
     }
   }
 
-  function dispatch(action, payload) {
+  function dispatch(action, payload, context) {
     if (!modelAccessor) {
       throw new Error("Model accessor required");
     }
@@ -48,7 +48,7 @@ export default function domux(defaultContainer, modelAccessor) {
     try {
       dispatchScopes++;
       hasChange = false;
-      const result = action(payload, { dispatch });
+      const result = action(payload, context);
       if (isBuiltInModel) return result;
       if (isPromiseLike(result)) {
         return result.finally(() => update(modelAccessor()));
@@ -88,12 +88,10 @@ export default function domux(defaultContainer, modelAccessor) {
       typeof itemBinder === "object" && typeof itemBinder.update === "function";
     const isChildBinder = Array.isArray(itemBinder);
 
-    bindings.push(function updateBinding(
-      rootModel,
-      container,
-      parentContext = currentContext
-    ) {
-      const context = { ...parentContext, dispatch: parentContext.dispatch };
+    bindings.push(function updateBinding(rootModel, container, parentContext) {
+      const context = {
+        ...parentContext,
+      };
       if (!parentContext) {
         if (modelAccessor) {
           context.rootModel = modelAccessor;
@@ -101,6 +99,13 @@ export default function domux(defaultContainer, modelAccessor) {
         if (defaultContainer) {
           container.rootContainer = defaultContainer;
         }
+        context.dispatch = function (action, payload) {
+          return dispatch(action, payload, context);
+        };
+      } else {
+        context.dispatch = function (action, payload) {
+          return parentContext.dispatch(action, payload, context);
+        };
       }
       context.container = container || context.rootContainer;
 
