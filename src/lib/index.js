@@ -2,7 +2,10 @@ const defaultDomSelector = (model) => model;
 const templateClassName = "domux-template";
 
 export default function domux(defaultContainer, modelAccessor) {
-  if (typeof defaultContainer === "function") {
+  if (
+    typeof defaultContainer === "function" ||
+    defaultContainer instanceof Model
+  ) {
     modelAccessor = defaultContainer;
   }
   defaultContainer = undefined;
@@ -10,13 +13,29 @@ export default function domux(defaultContainer, modelAccessor) {
   const instance = {
     add,
     update,
-    action,
+    // action,
     dispatch,
   };
   const bindings = [];
   const currentContext = {
     dispatch,
   };
+  let hasChange = false;
+  let isBuiltInModel = false;
+  let dispatchScopes = 0;
+
+  if (modelAccessor instanceof Model) {
+    isBuiltInModel = true;
+    modelAccessor = modelAccessor.__accessor;
+    modelAccessor.listen(handleChange);
+  }
+
+  function handleChange() {
+    hasChange = true;
+    if (!dispatchScopes) {
+      update(modelAccessor());
+    }
+  }
 
   function dispatch(action, payload) {
     if (!modelAccessor) {
@@ -24,21 +43,31 @@ export default function domux(defaultContainer, modelAccessor) {
     }
 
     try {
+      dispatchScopes++;
+      hasChange = false;
       const result = action(payload, { dispatch });
+      if (isBuiltInModel) return result;
       if (isPromiseLike(result)) {
         return result.finally(() => update(modelAccessor()));
       }
       return result;
     } finally {
-      update(modelAccessor());
+      dispatchScopes--;
+      if (isBuiltInModel) {
+        if (hasChange && !dispatchScopes) {
+          update(modelAccessor());
+        }
+      } else {
+        update(modelAccessor());
+      }
     }
   }
 
-  function action(fn) {
-    return function (payload) {
-      return dispatch(fn, payload);
-    };
-  }
+  // function action(fn) {
+  //   return function (payload) {
+  //     return dispatch(fn, payload);
+  //   };
+  // }
 
   function add() {
     // add(domSelector, binder)
@@ -56,12 +85,40 @@ export default function domux(defaultContainer, modelAccessor) {
       typeof itemBinder === "object" && typeof itemBinder.update === "function";
     const isChildBinder = Array.isArray(itemBinder);
 
-    bindings.push(function (
+    bindings.push(function updateBinding(
       rootModel,
       container,
       parentContext = currentContext
     ) {
       const context = { ...parentContext, dispatch: parentContext.dispatch };
+      if (!parentContext) {
+        if (modelAccessor) {
+          context.rootModel = modelAccessor;
+        }
+        if (defaultContainer) {
+          container.rootContainer = defaultContainer;
+        }
+      }
+      context.container = container || context.rootContainer;
+
+      if (!context.container.__bindingCache) {
+        context.container.__bindingCache = new WeakMap();
+      }
+
+      let bindingCache = context.container.__bindingCache.get(updateBinding);
+      if (!bindingCache) {
+        context.container.__bindingCache.set(
+          updateBinding,
+          (bindingCache = {
+            callbacks: callbackFactory(),
+          })
+        );
+      }
+
+      bindingCache.callbacks.resetHookIndex();
+      context.callback = bindingCache.callbacks;
+
+      context.update = () => updateBinding(...arguments);
       const dom =
         domSelector === "this"
           ? container
@@ -154,13 +211,16 @@ export default function domux(defaultContainer, modelAccessor) {
 }
 
 Object.assign(domux, {
+  model(props) {
+    return new Model(props);
+  },
   add() {
     return domux().add(...arguments);
   },
 });
 
 function updateElement(dom, model, prevModel = {}) {
-  if (!dom.__dispatchedOnCreate) {
+  if (!dom.__created) {
     dom.__styleText = (dom.getAttribute("style") || "") + ";";
     dom.__classText = (dom.getAttribute("class") || "") + " ";
   }
@@ -170,9 +230,11 @@ function updateElement(dom, model, prevModel = {}) {
     const isProp = key[0] === "$";
     const prop = isProp ? key.substr(1) : undefined;
     if (key === "#text") {
-      dom.textContent = value;
+      dom.textContent =
+        typeof value === "undefined" || value === null ? "" : value;
     } else if (key === "#html") {
-      dom.innerHTML = value;
+      dom.innerHTML =
+        typeof value === "undefined" || value === null ? "" : value;
     } else if (key === "style") {
       if (!isEqual(dom.__styles, value)) {
         dom.__styles = value;
@@ -190,8 +252,8 @@ function updateElement(dom, model, prevModel = {}) {
     }
   });
 
-  if (!dom.__dispatchedOnCreate) {
-    dom.__dispatchedOnCreate = true;
+  if (!dom.__created) {
+    dom.__created = true;
     if (dom.oncreate) {
       dom.oncreate({ type: "create", target: dom });
     }
@@ -245,6 +307,110 @@ function isEqual(a, b) {
     return a[key] === b[key];
   };
   return Object.keys(a).every(comparer) && Object.keys(b).every(comparer);
+}
+
+const emptyMap = new Map();
+const unset = {};
+emptyMap.value = unset;
+
+function callbackFactory() {
+  const cache = createArrayKeyedMap();
+
+  return Object.assign(
+    function (func, ...keys) {
+      cache.hookIndex++;
+      return cache.getOrAdd([cache.hookIndex].concat(keys), () => func);
+    },
+    {
+      resetHookIndex() {
+        cache.hookIndex = 0;
+      },
+    }
+  );
+}
+
+function createArrayKeyedMap() {
+  const root = new Map();
+  const values = [];
+  root.value = unset;
+
+  function getMap(key, createIfNotExist) {
+    const keyArray = Array.isArray(key) ? key : [key];
+    let prev = root;
+    for (let i = 0; i < keyArray.length; i++) {
+      const item = keyArray[i];
+      const map = prev.get(item);
+      if (typeof map === "undefined") {
+        if (!createIfNotExist) {
+          return emptyMap;
+        }
+        const newMap = new Map();
+        newMap.value = unset;
+        prev.set(item, newMap);
+        prev = newMap;
+      } else {
+        prev = map;
+      }
+    }
+    return prev;
+  }
+
+  return {
+    set(key, value) {
+      const map = getMap(key, true);
+      if (map.value === unset) {
+        values[values.length] = map;
+      }
+      map.value = value;
+    },
+    get(key) {
+      const value = getMap(key, false).value;
+      return value === unset ? undefined : value;
+    },
+    getOrAdd(key, creator) {
+      const map = getMap(key, true);
+      if (map.value === unset) {
+        map.value = creator(key);
+      }
+      return map.value;
+    },
+    clear() {
+      root.clear();
+    },
+    delete(key) {
+      getMap(key, false).value = unset;
+    },
+    *values() {
+      for (const map of values) {
+        yield map.value;
+      }
+    },
+  };
+}
+
+class Model {
+  constructor(props = {}) {
+    const listeners = [];
+    this.__accessor = () => props;
+    this.__accessor.listen = (listener) => listeners.push(listener);
+    Object.keys(props).forEach((key) => {
+      Object.defineProperty(this, key, {
+        get() {
+          return props[key];
+        },
+        set(value) {
+          if (props[key] === value) return;
+          props = {
+            ...props,
+            [key]: value,
+          };
+          for (let i = 0; i < listeners.length; i++) {
+            listeners[i](props);
+          }
+        },
+      });
+    });
+  }
 }
 
 if (!document.querySelector("#domux-styles")) {

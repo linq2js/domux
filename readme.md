@@ -203,6 +203,31 @@ const listBinder = domux
 listBinder.update(rootModel);
 ```
 
+## Using custom container
+
+By default, Domux performs updating from document element, you can specify other container
+
+```js
+const binder = domux(document.getElementById("root")).add("selector", () => {});
+```
+
+## Builtin Model
+
+Domux provides a built-in model class, that helps you modify app data more efficiently and easier
+
+```js
+const rootModel = domux.model({ count: 1 });
+const rootBinder = domux(rootModel).add("h1", (model) => ({
+  "#text": model.count,
+  $onclick() {
+    // model object is plain object, do not modify its prop
+    // we should update rootModel
+    rootModel.count++;
+    // dont need to call rootBinder.update(rootModel)
+  },
+}));
+```
+
 ## Dependencies
 
 Nothing

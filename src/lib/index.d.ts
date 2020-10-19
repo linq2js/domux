@@ -10,7 +10,11 @@ export interface Dispatcher {
     payload?: TPayload
   ): TReturn;
 }
-export interface Context extends Dispatcher {}
+export interface Context extends Dispatcher {
+  rootModel: Function;
+  rootContainer: Element | Document;
+  container: Element | Document;
+}
 
 export interface AddBinding<TModel = any> {
   (
@@ -48,13 +52,22 @@ export interface DomBinder<TModel = any> extends Dispatcher {
 export interface Domux extends Function {
   (): DomBinder;
   <TModel>(modelAccessor: () => TModel): DomBinder<TModel>;
+  <TModel>(model: Model<TModel>): DomBinder<TModel>;
   <TModel>(
     container: Element | Document,
     modelAccessor: () => TModel
   ): DomBinder<TModel>;
+  <TModel>(container: Element | Document, model: Model<TModel>): DomBinder<
+    TModel
+  >;
   (container: Element | Document): DomBinder;
   add: AddBinding;
+  model<T extends { [key: string]: any }>(props: T): Model<T>;
 }
+
+export class ModelBase {}
+
+export type Model<T> = T & ModelBase;
 
 declare const domux: Domux;
 

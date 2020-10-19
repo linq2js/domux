@@ -1,5 +1,7 @@
 import domux from "./index";
 
+const b = domux.model({ count: 0 });
+
 const rootElement = document.getElementById("root");
 
 rootElement.innerHTML = `
@@ -9,6 +11,10 @@ rootElement.innerHTML = `
 `;
 
 let rootModel = 0;
+
+const R = domux(b).add("h1", (m) => ({
+  "#text": m.count,
+}));
 
 const Root$ = domux(() => rootModel)
   .add("h1", (model) => ({
