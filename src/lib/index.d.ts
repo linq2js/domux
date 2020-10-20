@@ -1,102 +1,106 @@
-export interface ElementProps {
-  "#text"?: any;
-  "#html"?: any;
+export interface Options<TModel = any> {
+  model?: TModel | (() => TModel);
+  container?: Node;
   [key: string]: any;
 }
 
-export interface Dispatcher {
-  dispatch<TPayload = never, TReturn = void>(
-    action: (payload?: TPayload) => TReturn,
+export type Action<TPayload = never, TReturn = void, TContext = never> = (
+  payload?: TPayload,
+  context?: TContext
+) => TReturn;
+
+export interface Context<TModel> {
+  rootModel: any;
+  rootContainer: Node;
+  container: Node;
+  node: Node;
+  component: Component<TModel>;
+  dispatch<TPayload, TReturn>(
+    action: Action<TPayload, TReturn, Context<TModel>>,
     payload?: TPayload
   ): TReturn;
-}
-export interface Context extends Dispatcher {
-  rootModel: Function;
-  rootContainer: Element | Document;
-  container: Element | Document;
+  [key: string]: any;
 }
 
-export type DomSelector = "this" | string;
-
-export interface Binding<TModel> {
-  target: DomSelector;
+export interface BindingResult<TModel> {
+  id?: any;
+  class?: Classes | any;
+  style?: Styles | any;
+  text?: any;
+  html?: any;
+  init?: (() => Node | any) | Node | any;
+  on?: Events;
+  prop?: Properties;
+  attr?: Attributes;
+  children?: ChildrenOptions<any, TModel>;
 }
 
-export interface SingleElementBinding<TModel> extends Binding<TModel> {
-  props: (model?: TModel) => ElementProps;
-  binder: DomBinder<TModel>;
+export interface ChildrenOptions<TItem, TModel> {
+  model: TItem[];
+  update:
+    | Component<TItem>
+    | BindingDelegate<TItem, BindingResult<TItem> | void, TModel>;
 }
 
-export interface MultipleElementsBinding<TModel, TItemModel>
-  extends Binding<TModel> {
-  list: (model?: TModel) => TItemModel[];
-  item:
-    | [DomBinder<TModel>]
-    | ((model?: TItemModel, context?: Context) => ElementProps);
+export type BindingDelegate<TModel, TResult = any, TContextModel = TModel> = (
+  model?: TModel,
+  context?: Context<TModel>
+) => TResult;
+
+export interface Properties {
+  [key: string]: any;
 }
 
-export interface AddBinding<TModel = any> {
-  (domSelector: DomSelector, appender: DomAppender): DomBinder;
-  (
-    domSelector: DomSelector,
-    propsBuilder: (model?: TModel, context?: Context) => ElementProps
-  ): DomBinder;
-
-  (domSelector: DomSelector, binder: DomBinder<TModel>): DomBinder;
-
-  <TItemModel>(
-    domSelector: DomSelector,
-    listModelSelector: (model?: TModel) => TItemModel[],
-    itemPropsBuilder: (model?: TItemModel, context?: Context) => ElementProps
-  ): DomBinder;
-
-  <TItemModel>(
-    domSelector: DomSelector,
-    listModelSelector: (model?: TModel) => TItemModel[],
-    itemBinder: [DomBinder<TItemModel>]
-  ): DomBinder;
-
-  <TResult>(
-    domSelector: DomSelector,
-    modelSelector: (model?: TModel) => TResult,
-    binder: DomBinder<TResult>
-  ): DomBinder;
-
-  (...bindings: Binding<TModel>[]);
+export interface Attributes {
+  [key: string]: any;
 }
 
-export interface DomBinder<TModel = any> extends Dispatcher {
-  add: AddBinding<TModel>;
-
-  update(model: TModel, container?: Element): DomBinder;
+export interface Events {
+  [key: string]: (e: Event) => any;
 }
 
-export interface Domux extends Function {
-  (): DomBinder;
-  <TModel>(modelAccessor: () => TModel): DomBinder<TModel>;
-  <TModel>(model: Model<TModel>): DomBinder<TModel>;
-  <TModel>(
-    container: Element | Document,
-    modelAccessor: () => TModel
-  ): DomBinder<TModel>;
-  <TModel>(container: Element | Document, model: Model<TModel>): DomBinder<
-    TModel
-  >;
-  (container: Element | Document): DomBinder;
-  add: AddBinding;
-  model<T extends { [key: string]: any }>(props: T): Model<T>;
-  self: DomAppender;
-  ref<TModel>(ref: () => DomBinder<TModel>): DomBinder<TModel>;
+export interface Styles {
+  [key: string]: any;
 }
 
-export class DomAppender {
-  constructor(append: (container: Element, target: Element) => any);
+export interface Classes {
+  [key: string]: any;
 }
 
-export class ModelBase {}
+export type QuerySelector = "this" | string;
+
+export type Binding<TModel> = BindingDelegate<TModel, BindingResult<TModel>>;
+
+export interface Bindable<TModel> {
+  one(
+    query: QuerySelector,
+    binding: Component<TModel> | Binding<TModel>
+  ): Component<TModel>;
+  all(
+    query: QuerySelector,
+    binding: Component<TModel> | Binding<TModel>
+  ): Component<TModel>;
+}
+
+export interface Component<TModel> extends Bindable<TModel> {
+  bind(): void;
+  bind(model: TModel, container?: Node);
+  bind(container: Node);
+}
+
+export interface ModelBase {}
 
 export type Model<T> = T & ModelBase;
 
-declare const domux: Domux;
+export interface DefaultExports extends Bindable<any> {
+  <TModel = any>(options?: Options<TModel>): Component<TModel>;
+  model<T extends { [key: string]: any }>(props: T): Model<T>;
+  nested(
+    childModel: BindingDelegate<any, any[]>,
+    childComponent?: BindingDelegate<any, Component<any> | BindingDelegate<any>>
+  ): Binding<any>;
+}
+
+declare const domux: DefaultExports;
 
 export default domux;

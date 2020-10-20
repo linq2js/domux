@@ -1,39 +1,14 @@
 import domux from "./index";
 
-const b = domux.model({ count: 0 });
-
-const rootElement = document.getElementById("root");
-
-rootElement.innerHTML = `
-  <h1></h1>
-  <button id="increase-sync">Increase</button>
-  <button id="increase-async">Increase Async</button>
-`;
-
-let rootModel = 0;
-
-const R = domux(b).add("h1", (m) => ({
-  "#text": m.count,
+domux({
+  model: domux.model({
+    count: 1,
+    nodes: [{ title: "item 1" }, { title: "item 2" }],
+  }),
+}).one("span", (model) => ({
+  text: model.count,
+  children: {
+    model: model.nodes,
+    update: null,
+  },
 }));
-
-const Root$ = domux(() => rootModel)
-  .add("h1", (model) => ({
-    "#text": model,
-  }))
-  .add("#increase-sync", (model, { dispatch }) => ({
-    $onclick: () => dispatch(increase),
-  }))
-  .add("#increase-async", (model, { dispatch }) => ({
-    $onclick: () => dispatch(increaseAsync),
-  }));
-
-function increase() {
-  rootModel++;
-}
-
-async function increaseAsync() {
-  await new Promise((resolve) => setTimeout(resolve, 1000));
-  Root$.dispatch(increase);
-}
-
-Root$.update();

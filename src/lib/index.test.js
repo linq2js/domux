@@ -19,9 +19,9 @@ test("counter", () => {
     <h1></h1>
   `;
 
-  const binder = domux(rootModel).add("h1", (model) => ({
-    "#text": model.count,
-    $onclick: () => rootModel.count++,
+  const binder = domux({ model: rootModel }).one("h1", (model) => ({
+    text: model.count,
+    on: { click: () => rootModel.count++ },
   }));
 
   binder.update();
@@ -29,9 +29,11 @@ test("counter", () => {
   expect(query("h1").textContent).toBe("0");
   query("h1").click();
   expect(query("h1").textContent).toBe("1");
+  query("h1").click();
+  expect(query("h1").textContent).toBe("2");
 });
 
-test("appender", () => {
+test("nested components", () => {
   const tree = {
     id: "root",
     title: "root",
@@ -57,17 +59,17 @@ test("appender", () => {
     </div>
   `;
   const nodeBinder = domux
-    .add(":scope > .children", domux.self)
-    .add("this", (model) => ({
+    .one(
+      ">.children",
+      domux.nested((model) => model.children)
+    )
+    .one("this", (model) => ({
       id: model.id,
     }))
-    .add(":scope > .children", (model) => model.children, [
-      domux.ref(() => nodeBinder),
-    ])
-    .add(":scope > span", (model) => ({
-      "#text": model.title,
+    .one(">span", (model) => ({
+      text: model.title,
     }));
-  const rootBinder = domux.add(".tree > .node", nodeBinder);
+  const rootBinder = domux.one(".tree > .node", nodeBinder);
 
   rootBinder.update(tree);
   const rootNode = query("#root");
@@ -82,4 +84,48 @@ test("appender", () => {
 
   const c4Node = query("#c4", c2Node);
   expect(c4Node).not.toBeUndefined();
+});
+
+test("all()", () => {
+  document.body.innerHTML = "<h1></h1><h1></h1><h1></h1>";
+  domux.all("h1", (model) => ({ text: model.data })).update({ data: "hello" });
+  expect(
+    queryAll("h1")
+      .map((node) => node.innerHTML)
+      .join("|")
+  ).toBe("hello|hello|hello");
+});
+
+test("one()", () => {
+  document.body.innerHTML = "<h1></h1><h1></h1><h1></h1>";
+  domux.one("h1", (model) => ({ text: model.data })).update({ data: "hello" });
+  expect(
+    queryAll("h1")
+      .map((node) => node.innerHTML)
+      .join("|")
+  ).toBe("hello||");
+});
+
+test("simple list render", () => {
+  document.body.innerHTML = `
+  <ul>
+    <li></li>
+  </ul>
+  `;
+  const model = {
+    fruits: ["apple", "banana", "orange"],
+  };
+  domux
+    .one("h1 > span", (model) => ({
+      text: model.fruits.length,
+    }))
+    .one("ul", (model) => ({
+      children: {
+        model: model.fruits,
+        update: (fruit) => ({ text: fruit }),
+      },
+    }))
+    .update(model);
+
+  expect(queryAll("li").map((li) => li.innerHTML)).toEqual(model.fruits);
 });
